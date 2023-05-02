@@ -2,3 +2,4 @@ venv/
 .idea
 User_Data/
 collected_data/
+*.User_Data/

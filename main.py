@@ -1,12 +1,32 @@
 import os
 import pickle
+import logging
+from timeit import default_timer
+
+logging.basicConfig(
+    format='%(asctime)s %(message)s',
+    level=logging.INFO
+)
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from time import sleep
 
+logging.info(
+    f"CWD -> {os.getcwd()}"
+)
+
 # you can set the chromedriver path on the system path and remove this variable
-CHROMEDRIVER_PATH = 'utils/chromedriver.exe'
+CHROMEDRIVER_PATH = os.path.join(
+    os.getcwd(),
+    "utils",
+    "chromedriver.exe"
+)
+
+logging.info(
+    f"CHOMEDRIVER_PATH -> {CHROMEDRIVER_PATH}"
+)
+
 global SCROLL_TO, SCROLL_SIZE
 
 
@@ -40,6 +60,7 @@ def get_messages(driver, contact_list):
     print('>>> getting messages')
     conversations = []
     for contact in contact_list:
+        logging.info(f"Contact -> {contact}")
 
         sleep(2)
         user = driver.find_element_by_xpath('//span[contains(@title, "{}")]'.format(contact))
@@ -61,6 +82,8 @@ def get_messages(driver, contact_list):
             driver.execute_script('arguments[0].scrollTop = -' + str(scroll), conversation_pane)
             sleep(2)
             scroll += SCROLL_SIZE
+        
+        logging.info(f"Messages -> {messages}")
         conversations.append(messages)
         filename = 'collected_data/conversations/{}.json'.format(contact)
         os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -70,13 +93,22 @@ def get_messages(driver, contact_list):
 
 
 def main():
+
+    start = default_timer()
+
     global SCROLL_TO, SCROLL_SIZE
     SCROLL_SIZE = 600
     SCROLL_TO = 600
     conversations = []
 
     options = Options()
-    options.add_argument('user-data-dir=./User_Data')  # saving user data so you don't have to scan the QR Code again
+
+    user_data_path = os.path.join(
+        os.getcwd(),
+        "User_Data"
+    )
+
+    options.add_argument(f'user-data-dir={user_data_path}')  # saving user data so you don't have to scan the QR Code again
     driver = webdriver.Chrome(executable_path=CHROMEDRIVER_PATH, chrome_options=options)
     driver.get('https://web.whatsapp.com/')
     input('Press enter after scanning QR code or after the page has fully loaded\n')
@@ -102,8 +134,13 @@ def main():
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'wb') as fp:
             pickle.dump(conversations, fp)
+            duration = default_timer() - start
+            logging.info(f"Finished in {duration}")
     except Exception as e:
         print(e)
+        duration = default_timer() - start
+
+        logging.info(f"Finished in {duration}")
         driver.quit()
 
 
