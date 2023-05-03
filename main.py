@@ -29,6 +29,9 @@ logging.info(
 
 global SCROLL_TO, SCROLL_SIZE
 
+CONTACTS_CLASS = "_21S-L"
+MESSAGES_CLASS = "n5hs2j7m oq31bsqd gx1rr48f qh5tioqs" #"_2gzeB"
+
 
 # test sending a message
 def send_a_message(driver):
@@ -66,7 +69,7 @@ def get_messages(driver, contact_list):
         user = driver.find_element_by_xpath('//span[contains(@title, "{}")]'.format(contact))
         user.click()
         sleep(3)
-        conversation_pane = driver.find_element_by_xpath("//div[@class='_2-aNW']")
+        conversation_pane = driver.find_element_by_xpath(f"//div[@class='{MESSAGES_CLASS}']")
 
         messages = set()
         length = 0
@@ -119,7 +122,7 @@ def main():
         contacts = set()
         length = 0
         while True:
-            contacts_sel = driver.find_elements_by_class_name('_357i8')  # get just contacts ignoring groups
+            contacts_sel = driver.find_elements_by_class_name(CONTACTS_CLASS)  # get just contacts ignoring groups
             contacts_sel = set([j.text for j in contacts_sel])
             conversations.extend(get_messages(driver, list(contacts_sel-contacts)))
             contacts.update(contacts_sel)
