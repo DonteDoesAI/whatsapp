@@ -25,7 +25,9 @@ $modules | ForEach {
     $_ | Import-Module 
 }
 
-
+# XPaths are key to finding elements in the XML - use the 'inspect' tool
+# in Chrome to find and generate xpaths for data; there is no need for a whole
+# lot of guesswork.
 $CONTACTS_CLASS = "_21S-L"
 $MESSAGES_CLASS = "n5hs2j7m oq31bsqd gx1rr48f qh5tioqs" #"_2gzeB"
 $MESSAGE_PANE
@@ -39,6 +41,8 @@ function Get-Messages {
 
     Write-Host "Getting Messages..." -ForegroundColor Green
 
+    $conversations = @{}
+
     foreach ($contact in $contact_list) {
         Write-Host "Contact: $($contact)" -ForegroundColor Green
 
@@ -48,33 +52,85 @@ function Get-Messages {
         $search_bar = $driver.FindElementbyXPath('//*[@id="side"]/div[1]/div/div/div[2]/div/div[1]/p')
         $search_bar.Click()
 
-        #FIXME - need to figure out how to remove text from search bar.
+        # Check to clear search bar in case it has text.
         if ($search_bar.Text -ne "") {
-            $search_bar.SendKeys([System.Windows.Forms.SendKeys]::SendWait("^a")) | Out-Null # Clear previous searches
-            Start-Sleep -Seconds 2
+            $search_bar.SendKeys(
+                [OpenQA.Selenium.Keys]::Control + `
+                "A"
+            )
+            $search_bar.SendKeys(
+                [OpenQA.Selenium.Keys]::Backspace
+            )
+
+            # Refresh the element selection - when we clear it, the element actually changes.
+            $search_bar = $driver.FindElementbyXPath('//*[@id="side"]/div[1]/div/div/div[2]/div/div[1]/p')
+            $search_bar.Click()
         }
 
         $search_bar.SendKeys($contact)
 
-        # Xpath to click the conversation head
         $xpath = '//span[contains(@title, "{0}")]' -f ($contact)
         $user = $Web_Driver.FindElementByXpath($xpath)
+
+        Start-Sleep -Seconds 5
+
         $user.click()
 
         # Give 3 seconds for the page to render
         Start-Sleep -Seconds 3
+
         # Xpath to identify a conversation
         $xpath = "//div[@class='$($MESSAGES_CLASS)']"
         $conversation_pane = $Web_Driver.FindElementByXpath($xpath)
+        $conversation_pane_last_height = $conversation_pane_size.size.height
+
+        $user_details = $Web_Driver.FindElementByXpath("/html/body/div[1]/div/div/div[5]/div/header/div[1]")
+        $user_details.click()
+
+        Start-Sleep -Seconds 5
+
+        try {
+            $phone_number = $Web_Driver.FindElementByXPath("/html/body/div[1]/div/div/div[6]/span/div/span/div/div/section/div[1]/div/div[2]/div").Text
+        } catch {
+            $phone_number = "NO_PHONE"
+        }
+
+        try {
+            $full_name = $Web_Driver.FindElementByXpath('//*[@id="app"]/div/div/div[6]/span/div/span/div/div/section/div[1]/div/div[2]/h2').Text
+        } catch {
+            $full_name = "NO_NAME"
+        }
+
+        if ($full_name -eq "") {
+            $full_name = "NO_NAME"
+        }
+
 
         $messages = New-Object System.Collections.Generic.HashSet[String]
 
         $length = 0
 
-        $scroll = $SCROLL_SIZE
+        # $scroll = $SCROLL_SIZE
+        
+        # Use "Page Up" to move backwards in time to get more messages; somewhat
+        # bad practice to use a discrete amount of times to measure distance but
+        # this should catch 90% of cases.
+        $pg_up_num_times = 0
+        While ($true) {
+            $conversation_pane.SendKeys([OpenQA.Selenium.Keys]::PageUp)
+            if ($conversation_pane.Size.Height -eq $conversation_pane_last_height) {
+                if ($pg_up_num_times -ge 10) {
+                    Write-Host "End of conversation hit! Scraping..." -ForegroundColor Green
+                    break
+                }
+                $pg_up_num_times +=1 
+                continue
+            }
+            $conversation_pane_last_height = $conversation_pane.Size.Height
+            $pg_up_num_times = 0
+        }
 
         While ($true) {
-
             # Get all rows that are rendered; remove rows that have no text.
             $elements = $Web_Driver.FindElementsByXpath("//div[@class='copyable-text']") | `
                 Where-Object {$_.TagName -eq "div"}
@@ -83,53 +139,47 @@ function Get-Messages {
                 $header = $e.GetAttribute('data-pre-plain-text')
                 $message_body = $e.text
                 $full_message = "$($header.trim()) $($message_body)"
-                $messages.Add($full_message)
-                Write-Host $messages -ForegroundColor Green
+                $messages.Add($full_message)               
+                Write-Host $full_message -ForegroundColor Green
             }
 
+            # If all messages have been collected, export to a json and continue with
+            # the next contact.
             if ($length -eq $messages.Count) {
+                $conversations[$contact] = $messages
+
+                $file_directory = [System.IO.Path]::Combine(
+                    "Output",
+                    "collected_data",
+                    "conversations"
+                )
+            
+                if (!(Test-Path $file_directory)) {
+                    New-Item $file_directory -ItemType Directory
+                }
+            
+                $file_path = [System.IO.Path]::Combine(
+                    $file_directory,
+                    "$($phone_number).$($full_name).json"
+                )
+
+                if (Test-Path $file_path) {
+                    Remove-Item $file_path
+                }
+            
+                $json_string = $messages | ConvertTo-Json -Depth 100
+                $json_string | Out-File $file_path
+                # Write-Host "Messages -> $($messages)" -ForegroundColor White
                 break
             }
 
             else {
                 $length = $messages.Count
             }
-
-            $driver.ExecuteScript(
-                ('arguments[0].scrollTop = -{0}' -f ($scroll)), 
-                $conversation_pane
-            )
             Start-Sleep -Seconds 2
-            $scroll += $SCROLL_SIZE
         }
-        Scroll-Pane -Web_Driver $Web_Driver
     }
-
-    Write-Host "Messages -> $($messages)" -ForegroundColor White
-    
-    $conversations.add($messages)
-
-    $file_directory = [System.IO.Path]::Combine(
-        "Output",
-        "collected_data",
-        "conversations"
-    )
-
-    if (!(Test-Path $file_directory)) {
-        New-Item $file_directory -ItemType Directory
-    }
-
-    $file_path = [System.IO.Path]::Combine(
-        $file_directory,
-        "$($contact).json"
-    )
-
-    $json_string = $messages | ConvertTo-Json -Depth 100
-
-    $json_string | Out-File $file_path
-
     return $conversations
-
 }
 
 $scroll_dict = [Ordered]@{
@@ -221,8 +271,6 @@ try {
         else {
             $length = $contacts.Count
         }
-
-        Scroll-Pane -Web_Driver $driver -Pane "pane-side"
     }
     Write-Host "$($contacts.count) contacts retrieved!" -ForegroundColor Green
 
