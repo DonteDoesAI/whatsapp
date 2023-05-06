@@ -1,5 +1,6 @@
 # Required Modules
 # https://chromedriver.chromium.org/downloads
+# https://www.selenium.dev/selenium/docs/api/dotnet/html/T_OpenQA_Selenium_Keys.htm
 $modules = @(
     "ImportExcel" # https://github.com/dfinke/ImportExcel
     "Selenium"    # https://github.com/adamdriscoll/selenium-powershell
@@ -105,6 +106,65 @@ function Get-Messages {
             $full_name = "NO_NAME"
         }
 
+        $subject_folder_name = "$($phone_number).$($full_name)"
+
+        $subject_folder_path = [System.IO.Path]::Combine(
+            $PSScriptRoot,
+            "Output",
+            "collected_data",
+            "conversations",
+            $subject_folder_name
+        )
+    
+        if (!(Test-Path $subject_folder_path)) {
+            New-Item $subject_folder_path -ItemType Directory
+            New-Item ([System.IO.Path]::combine($subject_folder_path,"Media")) -ItemType Directory
+        }
+
+        # Download all media 
+        try{ 
+            # Click the media pane
+            $media_pane = $Web_Driver.FindElementByXPath(
+                '//*[@data-testid="section-media"]'
+            )
+            $media_pane.Click()
+
+            # Click the 'Download' Button on all files
+            # to preload the media; there is an empty try-catch block
+            # that essentially ignores any errors when attempting to click a download button.
+            $Web_Driver.FindElementsByXPath(
+                '//*[@data-testid="media-download"]'
+            ) | ForEach-Object {
+                try {$_.Click()} catch {}
+            }
+
+            # 
+            $media_files = $Web_Driver.FindElementsByXPath(
+                '//*[@data-testid="media-canvas"]'
+            ) 
+
+            $media_files | ForEach-Object {
+                $_.Click()
+                Start-Sleep -Seconds 3
+
+                $Web_Driver.FindElementsByXPath(
+                    '//*[@aria-label="Download"]'
+                ).Click()
+                Start-Sleep -Seconds 3
+
+                $(
+                    (Get-ChildItem "C:\Users\$($env:USERNAME)\Downloads" `
+                        | Sort-Object -Descending LastWriteTime)[0] `
+                            | Move-Item -Destination $([System.IO.Path]::combine($subject_folder_path,"Media")) -Force
+                )
+
+                $Web_Driver.FindElementsByXPath(
+                    '//*[@aria-label="Close"]'
+                ).Click()
+            }
+        }
+        catch {}
+
 
         $messages = New-Object System.Collections.Generic.HashSet[String]
 
@@ -147,28 +207,18 @@ function Get-Messages {
             # the next contact.
             if ($length -eq $messages.Count) {
                 $conversations[$contact] = $messages
-
-                $file_directory = [System.IO.Path]::Combine(
-                    "Output",
-                    "collected_data",
-                    "conversations"
-                )
             
-                if (!(Test-Path $file_directory)) {
-                    New-Item $file_directory -ItemType Directory
-                }
-            
-                $file_path = [System.IO.Path]::Combine(
-                    $file_directory,
-                    "$($phone_number).$($full_name).json"
+                $conversation_file_path = [System.IO.Path]::Combine(
+                    $subject_folder_path,
+                    "conversation.txt"
                 )
 
-                if (Test-Path $file_path) {
-                    Remove-Item $file_path
+                if (Test-Path $conversation_file_path) {
+                    Remove-Item $conversation_file_path
                 }
             
                 $json_string = $messages | ConvertTo-Json -Depth 100
-                $json_string | Out-File $file_path
+                $json_string | Out-File $conversation_file_path
                 # Write-Host "Messages -> $($messages)" -ForegroundColor White
                 break
             }
@@ -234,6 +284,12 @@ $user_data_path = [System.IO.Path]::Combine(
 )
 
 $whatsapp_url = "https://web.whatsapp.com/"
+$downloads_folder = [System.IO.Path]::Combine(
+    $PSScriptRoot,
+    "Temp"
+)
+New-Item $downloads_folder -ItemType Directory -ErrorAction Ignore
+
 $arguments = @(
     "user-data-dir=$($user_data_path)"
 )
@@ -276,14 +332,14 @@ try {
 
     Write-Host "$($conversations.count) conversations retreived!" -ForegroundColor Green
 
-    $file_directory = [System.IO.Path]::Combine(
+    $subject_folder_path = [System.IO.Path]::Combine(
         "collected_data"
     )
-    if (!(Test-Path $file_directory)) {
-        New-Item $file_directory -ItemType Directory
+    if (!(Test-Path $subject_folder_path)) {
+        New-Item $subject_folder_path -ItemType Directory
     }
     $file_path = [System.IO.Path]::Combine(
-        $file_directory,
+        $subject_folder_path,
         "all.json"
     )
 
