@@ -29,7 +29,6 @@ $modules | ForEach {
 # XPaths are key to finding elements in the XML - use the 'inspect' tool
 # in Chrome to find and generate xpaths for data; there is no need for a whole
 # lot of guesswork.
-$CONTACTS_CLASS = "_21S-L"
 $MESSAGES_CLASS = "n5hs2j7m oq31bsqd gx1rr48f qh5tioqs" #"_2gzeB"
 $MESSAGE_PANE
 
@@ -47,7 +46,7 @@ function Get-Messages {
     foreach ($contact in $contact_list) {
         Write-Host "Contact: $($contact)" -ForegroundColor Green
 
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 5
 
         # XPath to search bar:
         $search_bar = $driver.FindElementbyXPath('//*[@id="side"]/div[1]/div/div/div[2]/div/div[1]/p')
@@ -69,16 +68,19 @@ function Get-Messages {
         }
 
         $search_bar.SendKeys($contact)
+        
+        Start-Sleep -Seconds 5
 
         $xpath = '//span[contains(@title, "{0}")]' -f ($contact)
-        $user = $Web_Driver.FindElementByXpath($xpath)
+        $user = $Web_Driver.FindElementsByXpath($xpath) `
+            | Where-Object {$_.Text -eq $contact}
 
-        Start-Sleep -Seconds 5
+        # Start-Sleep -Seconds 5
 
         $user.click()
 
-        # Give 3 seconds for the page to render
-        Start-Sleep -Seconds 3
+        # Give 5 seconds for the page to render
+        Start-Sleep -Seconds 5
 
         # Xpath to identify a conversation
         $xpath = "//div[@class='$($MESSAGES_CLASS)']"
@@ -102,11 +104,26 @@ function Get-Messages {
             $full_name = "NO_NAME"
         }
 
+        try {
+            $group_name = $Web_Driver.FindElementsByXPath(
+                '//*[@id="app"]/div/div/div[6]/span/div/span/div/div/div/section/div[1]/div/div/div[2]'
+            )
+            if ($group_name -eq "") {
+                $group_name = "NO_GROUP"
+            }
+        } catch {
+            $group_name = "NO_GROUP"
+        }
+
         if ($full_name -eq "") {
             $full_name = "NO_NAME"
         }
 
-        $subject_folder_name = "$($phone_number).$($full_name)"
+        $subject_folder_name = "$($contact).$($phone_number).$($full_name).$($group_name)"
+
+        if ($contact -ne $full_name) {
+            Write-Host "Stop!"
+        }
 
         $subject_folder_path = [System.IO.Path]::Combine(
             $PSScriptRoot,
@@ -129,13 +146,15 @@ function Get-Messages {
             )
             $media_pane.Click()
 
+            Start-Sleep -Seconds 5
+
             # Click the 'Download' Button on all files
             # to preload the media; there is an empty try-catch block
             # that essentially ignores any errors when attempting to click a download button.
             $Web_Driver.FindElementsByXPath(
                 '//*[@data-testid="media-download"]'
             ) | ForEach-Object {
-                try {$_.Click()} catch {}
+                try {$_.Click()} catch {Write-Error $error[0]}
             }
 
             # 
@@ -145,12 +164,12 @@ function Get-Messages {
 
             $media_files | ForEach-Object {
                 $_.Click()
-                Start-Sleep -Seconds 3
+                Start-Sleep -Seconds 5
 
                 $Web_Driver.FindElementsByXPath(
                     '//*[@aria-label="Download"]'
                 ).Click()
-                Start-Sleep -Seconds 3
+                Start-Sleep -Seconds 5
 
                 $(
                     (Get-ChildItem "C:\Users\$($env:USERNAME)\Downloads" `
@@ -177,15 +196,17 @@ function Get-Messages {
         # this should catch 90% of cases.
         $pg_up_num_times = 0
         While ($true) {
+            # send a Pg-Up command
             $conversation_pane.SendKeys([OpenQA.Selenium.Keys]::PageUp)
             if ($conversation_pane.Size.Height -eq $conversation_pane_last_height) {
-                if ($pg_up_num_times -ge 10) {
+                if ($pg_up_num_times -ge 100) {
                     Write-Host "End of conversation hit! Scraping..." -ForegroundColor Green
                     break
                 }
                 $pg_up_num_times +=1 
                 continue
             }
+            Start-Sleep -Seconds 5
             $conversation_pane_last_height = $conversation_pane.Size.Height
             $pg_up_num_times = 0
         }
@@ -226,7 +247,7 @@ function Get-Messages {
             else {
                 $length = $messages.Count
             }
-            Start-Sleep -Seconds 2
+            Start-Sleep -Seconds 5
         }
     }
     return $conversations
@@ -271,7 +292,6 @@ Function Scroll-Pane {
 # Globals
 $SCROLL_TO = 600
 $SCROLL_SIZE = 600
-$conversations = [System.Collections.ArrayList]::new()
 
 $CHROMEDRIVER_PATH = [System.IO.Path]::Combine(
     ".",
@@ -309,17 +329,26 @@ try {
     $contacts = New-Object System.Collections.Generic.HashSet[String]
     
     $length = 0
+    
+    $side_pane = $driver.FindElementByXPath(
+        '//*[@data-testid="chat-list"]'
+    )
 
     While ($true) {
-        $contacts_sel = $driver.FindElementsByClassName($CONTACTS_CLASS)
+        # Add contacts repeatedley.
+        $driver.FindElementsByXPath('//div[@data-testid="cell-frame-title"]').text `
+            | Sort-Object | ForEach-Object {
+                $contacts.add($_)
+            }
 
-        $contacts_sel = $contacts_sel.text
-
-        $conversations.Add(
-            (Get-Messages -Web_Driver $driver -Contact_List ( $contacts_sel | Where-Object {$_ -notin $contacts}) )
-        )
-
-        $contacts.Add($contacts_sel)
+        # try {
+        #     $conversations.Add(
+        #         (Get-Messages -Web_Driver $driver -Contact_List ( $contacts_sel | Where-Object {$_ -notin $contacts}) )
+        #     )
+        # }
+        # catch {
+        #     break
+        # }
 
         if ( ($length -eq $contacts.Count) -and $length -ne 0 ) {
             break
@@ -327,7 +356,20 @@ try {
         else {
             $length = $contacts.Count
         }
+
+        Scroll-Pane `
+            -Web_Driver $driver `
+            -Pane pane-side
+        
     }
+    try {
+        $conversations = Get-Messages -Web_Driver $driver -Contact_List $contacts
+    }
+    catch {
+        Write-Error $error[0]
+    }
+        
+
     Write-Host "$($contacts.count) contacts retrieved!" -ForegroundColor Green
 
     Write-Host "$($conversations.count) conversations retreived!" -ForegroundColor Green
