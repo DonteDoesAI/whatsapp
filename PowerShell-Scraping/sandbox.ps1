@@ -119,7 +119,7 @@ function Get-Messages {
             $full_name = "NO_NAME"
         }
 
-        $subject_folder_name = "$($contact).$($phone_number).$($full_name).$($group_name)"
+        $subject_folder_name = "$($contact).$($phone_number).$($full_name)"
 
         if ($contact -ne $full_name) {
             Write-Host "Stop!"
