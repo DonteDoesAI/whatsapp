@@ -1,6 +1,8 @@
 # Required Modules
 # https://chromedriver.chromium.org/downloads - need a chrome driver that matches chrome version
 # https://www.selenium.dev/selenium/docs/api/dotnet/html/T_OpenQA_Selenium_Keys.htm
+
+Set-Location $PSScriptRoot
 $modules = @(
     "$($PSScriptRoot)\Modules\WhatsApp-Selenium.psm1" # Custom
 )
@@ -26,7 +28,7 @@ $modules | ForEach-Object {
 }
 
 $CHROMEDRIVER_PATH = [System.IO.Path]::Combine(
-    ".",
+    (Get-Item $PSScriptRoot | Select-Object -ExpandProperty Parent | Select-Object -ExpandProperty FullName),
     "utils"
 )
 

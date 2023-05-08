@@ -23,9 +23,6 @@ $modules | ForEach-Object {
     $_ | Import-Module 
 }
 
-# Globals
-$SCROLL_SIZE = 9000
-
 Function Clear-WhatsAppContactSearchBar {
     [CmdletBinding()]
     param(
@@ -78,55 +75,80 @@ Function Move-WhatsAppConversationPane {
     return $Web_Driver
 }
 
-Function Get-WhatsAppMedia {
+Function Get-WhatsAppFiles {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][Object]$Web_Driver,
-        [Parameter(Mandatory=$true)][Object]$Subject_Folder_Path
+        [Parameter(Mandatory=$true)][Object]$Subject_Folder_Path,
+        [Parameter(Mandatory=$false)][ValidateSet("Media","Docs")][Object]$File_Type
     )
 
     # Download all media 
     try{ 
         # Click the media pane
-        $media_pane = $Web_Driver.FindElementByXPath(
+        $media_links_docs_pane = $Web_Driver.FindElementByXPath(
             '//*[@data-testid="section-media"]'
         )
-        $media_pane.Click()
+        $media_links_docs_pane.Click()
 
         Start-Sleep -Seconds 5
 
-        # Click the 'Download' Button on all files
-        # to preload the media; there is an empty try-catch block
-        # that essentially ignores any errors when attempting to click a download button.
-        $Web_Driver.FindElementsByXPath(
-            '//*[@data-testid="media-download"]'
-        ) | ForEach-Object {
-            try {$_.Click()} catch {Write-Error $error[0]}
-        }
+        $media_pane = $Web_Driver.FindElementByXPath(
+            '//*[@title="{0}"]' -f ($File_Type)
+        )
+        $media_pane.Click()
 
-        # 
-        $media_files = $Web_Driver.FindElementsByXPath(
-            '//*[@data-testid="media-canvas"]'
-        ) 
+        Switch ($File_Type) {
+            ("Media") {
+                $data_testid_code = "media-download"
+                # Click the 'Download' Button on all files
+                # to preload the media; there is an empty try-catch block
+                # that essentially ignores any errors when attempting to click a download button.
+                $Web_Driver.FindElementsByXPath(
+                    '//*[@data-testid="{0}"]' -f $($data_testid_code)
+                ) | ForEach-Object {
+                    try {$_.Click()} catch {Write-Error $error[0]}
+                }
 
-        $media_files | ForEach-Object {
-            $_.Click()
-            Start-Sleep -Seconds 5
+                # 
+                $media_files = $Web_Driver.FindElementsByXPath(
+                    '//*[@data-testid="{0}"]' -f ($data_testid_code)
+                ) 
 
-            $Web_Driver.FindElementsByXPath(
-                '//*[@aria-label="Download"]'
-            ).Click()
-            Start-Sleep -Seconds 5
+                $media_files | ForEach-Object {
+                    $_.Click()
+                    Start-Sleep -Seconds 5
 
-            $(
-                (Get-ChildItem "C:\Users\$($env:USERNAME)\Downloads" `
-                    | Sort-Object -Descending LastWriteTime)[0] `
-                        | Move-Item -Destination $([System.IO.Path]::combine($Subject_Folder_Path,"Media")) -Force
-            )
+                    $Web_Driver.FindElementsByXPath(
+                        '//*[@aria-label="Download"]'
+                    ).Click()
+                    Start-Sleep -Seconds 5
 
-            $Web_Driver.FindElementsByXPath(
-                '//*[@aria-label="Close"]'
-            ).Click()
+                    $(
+                        (Get-ChildItem "C:\Users\$($env:USERNAME)\Downloads" `
+                            | Sort-Object -Descending LastWriteTime)[0] `
+                                | Move-Item -Destination $([System.IO.Path]::combine($Subject_Folder_Path,$File_Type)) -Force
+                    )
+
+                    $Web_Driver.FindElementsByXPath(
+                        '//*[@aria-label="Close"]'
+                    ).Click()
+                }
+            }
+            ("Docs") {
+                $data_testid_code = "doc-gallery"
+
+                $Web_Driver.FindElementsByXPath(
+                    '//*[@data-testid="{0}"]' -f $($data_testid_code)
+                ) | ForEach-Object {
+                    try {$_.Click()} catch {Write-Error $error[0]}
+                }
+                $(
+                    (Get-ChildItem "C:\Users\$($env:USERNAME)\Downloads" `
+                        | Sort-Object -Descending LastWriteTime)[0] `
+                            | Move-Item -Destination $([System.IO.Path]::combine($Subject_Folder_Path,$File_Type)) -Force
+                )
+            }
         }
     }
     catch {}
@@ -136,35 +158,45 @@ Function Get-WhatsAppMedia {
 Function Get-WhatsAppContacts {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true)][Object]$Web_Driver
+        [Parameter(Mandatory=$true)][Object]$Web_Driver,
+        [Parameter(Mandatory=$false)][Object]$Max_Times_Check=5
     )
 
     try {
         Write-Host "Getting contact list..." -ForegroundColor Green
         
         $contacts = New-Object System.Collections.Generic.HashSet[String]
-        
-        $length = 0
-    
-        While ($true) {
-            # Add contacts repeatedly.
-            $Web_Driver.FindElementsByXPath('//div[@data-testid="cell-frame-title"]').text `
-                | Sort-Object | ForEach-Object {
-                    $contacts.add($_) | Out-Null
-                }
-    
-            if ( ($length -eq $contacts.Count) -and $length -ne 0 ) {
-                break
-            } 
-            else {
-                $length = $contacts.Count
-            }
-    
-            Move-WhatsAppPane `
+
+        $scroll_level = 0
+
+        $max_height = Get-WhatsAppScrollMaxHeight `
+        -Web_Driver $Web_Driver `
+        -Arguments $(
+            Get-WhatsAppScrollBar `
                 -Web_Driver $Web_Driver `
                 -Pane pane-side
-            Start-Sleep -Seconds 5
+        )
+
+        while ($true) {
+            $scroll_level += 600
+            $Web_Driver.FindElementsByXPath('//div[@data-testid="cell-frame-title"]').text `
+            | Sort-Object | ForEach-Object {
+                $contacts.add($_) | Out-Null
+            }
+
+            if ($scroll_level -ge $max_height) {
+                break
+            }
+
+            # Iteratively scroll to the bottom
+            Move-WhatsAppPane `
+                -Web_Driver $Web_Driver `
+                -Pane pane-side `
+                -Scroll_Level $scroll_level
+
+            Start-Sleep -Seconds 2
         }
+
     } catch {
         Write-Error $error[0]
         break
@@ -173,21 +205,23 @@ Function Get-WhatsAppContacts {
     $deduped_sorted_contacts = $contacts | Where-Object {$_ -ne $null} | Sort-Object
     return $deduped_sorted_contacts
 }
-
-Function Move-WhatsAppPane {
+Function Get-WhatsAppScrollMaxHeight {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][Object]$Web_Driver,
+        [Parameter(Mandatory=$true)][Object]$Arguments
+    )
+    return $Web_Driver.ExecuteScript(
+        "return arguments[0].scrollHeight",
+        $Arguments
+    )
+}
+Function Get-WhatsAppScrollBar {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][Object]$Web_Driver,
         [Parameter(Mandatory=$false)][ValidateSet("pane-side","pane-message")][Object]$Pane="pane-side"
     )
-    Write-Host "Scrolling Side Pane..." -ForegroundColor Green
-
-    
-    $scroll_dict = [Ordered]@{
-        "pane-side"   = $SCROLL_SIZE
-        "pane-message"= $SCROLL_SIZE
-    }
-
     $pane_class = ""
     switch ($Pane) {
         "pane-side" {
@@ -201,17 +235,28 @@ Function Move-WhatsAppPane {
     $pane_object = $Web_Driver.FindElementById(
         $pane_class
     )
-    
+
+    return $pane_object 
+}
+Function Move-WhatsAppPane {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][Object]$Web_Driver,
+        [Parameter(Mandatory=$false)][ValidateSet("pane-side","pane-message")][Object]$Pane="pane-side",
+        [Parameter(Mandatory=$true)][Object]$Scroll_Level
+    )
+    Write-Host "Scrolling $($pane_class)..." -ForegroundColor Green
+
+    $pane_object = Get-WhatsAppScrollBar -Web_Driver $Web_Driver -Pane $Pane
+
+    # Scroll by a discrete amount
     $Web_Driver.ExecuteScript(
-        $("arguments[0].scrollTop = {0}" -f ($scroll_dict[$Pane])),
+        "arguments[0].scrollTop = $($Scroll_Level)",
         $pane_object
     )
-    Start-Sleep -Seconds 3
-    $scroll_dict[$Pane] += $SCROLL_SIZE
 
     return $Web_Driver
 }
-
 Function Get-WhatsAppMessages {
     [CmdletBinding()]
     param(
@@ -314,7 +359,8 @@ Function Get-WhatsAppMessages {
 
         # Helper method designed to trawl through the Web Page, and download all associated
         # media files.
-        $Web_Driver = Get-WhatsAppMedia -Web_Driver $Web_Driver -Subject_Folder_Path $subject_folder_path
+        $Web_Driver = Get-WhatsAppFiles -Web_Driver $Web_Driver -Subject_Folder_Path $subject_folder_path -File_Type Media
+        $Web_Driver = Get-WhatsAppFiles -Web_Driver $Web_Driver -Subject_Folder_Path $subject_folder_path -File_Type Docs
 
         $messages = New-Object System.Collections.Generic.HashSet[String]
 
