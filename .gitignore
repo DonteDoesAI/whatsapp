@@ -4,3 +4,5 @@ User_Data/
 collected_data/
 *.User_Data/
 *.Downloads/*
+*/chromedriver.exe
+*/LICENSE.chromedriver
