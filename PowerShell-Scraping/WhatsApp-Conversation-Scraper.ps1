@@ -1,61 +1,61 @@
 # Required Modules
 # https://chromedriver.chromium.org/downloads - need a chrome driver that matches chrome version
 # https://www.selenium.dev/selenium/docs/api/dotnet/html/T_OpenQA_Selenium_Keys.htm
+$ErrorActionPreference = "Stop"
+$DebugPreference = "Continue"
+
+Set-Location $PSScriptRoot
 $modules = @(
-    "$($PSScriptRoot)\Modules\WhatsApp-Selenium.psm1" # Custom
+    "$($PSScriptRoot)\Modules\SeleniumWhatsApp.psm1" # Custom
 )
 
 # If the modules don't exist, install for the current scope
 $modules | ForEach-Object {
     if (!(Get-Module -ListAvailable -Name $_)) {
-        Write-Host "'$($_)' does not exist; installing..." -ForegroundColor Green;
+        Write-Output "'$($_)' does not exist; installing...";
         Install-Module $_ `
             -Scope CurrentUser `
             -ErrorAction Stop `
             -Force 
     }
     else {
-        Write-Host "'$($_)' exists!" -ForegroundColor Green;
+        Write-Output "'$($_)' exists!"
     }
 }
 
 # Import all modules necessary
 $modules | ForEach-Object {
-    Write-Host "Importing '$($_)'..." -ForegroundColor Green;
+    Write-Output "Importing '$($_)'..."
     $_ | Import-Module -ErrorACtion Stop
 }
 
 $CHROMEDRIVER_PATH = [System.IO.Path]::Combine(
-    ".",
+    (Get-Item $PSScriptRoot).Parent.FullName,
     "utils"
 )
 
-$user_data_path = [System.IO.Path]::Combine(
-    $PSScriptRoot,
-    "$($driver_choice).User_Data"
-)
+$CHROME_DOWNLOAD_DIR_PATH = $([System.IO.Path]::combine($PSScriptRoot,"Chrome.Downloads"))
+$CHROME_USER_PREFS_PATH = $([System.IO.Path]::combine($PSScriptRoot,"Chrome.User_Data")) 
 
-$whatsapp_url = "https://web.whatsapp.com/"
+$driver = Start-ChromeDriver `
+    -Chrome_Driver_Path $CHROMEDRIVER_PATH `
+    -Download_Directory  $CHROME_DOWNLOAD_DIR_PATH `
+    -User_Data $CHROME_USER_PREFS_PATH
 
-$arguments = @(
-    "user-data-dir=$($user_data_path)"
-)
+Start-Sleep -Seconds 3
 
-$ChromeOptions = New-Object OpenQA.Selenium.Chrome.ChromeOptions
-$ChromeOptions.AddArguments($arguments)
+# Navigate to WhatsApp
+$driver.Navigate().GoToUrl("https://web.whatsapp.com")
 
-# Starting a driver with the given cmdlet is a pain in the butt; apparently calling the C# method directly
-# is much more stable, using the Chrome Driver DIRECTORY (vice the explicit path).
-$driver = New-Object OpenQA.Selenium.Chrome.ChromeDriver($CHROMEDRIVER_PATH, $ChromeOptions)
-Enter-SeUrl $whatsapp_url -Driver $driver # Navigate to WhatsApp
 Read-Host "Press Enter after the QR Code is Entered"
 
 try {
-    Write-Host "Getting contact list..." -ForegroundColor Green
+    Write-Output "Getting contact list..." -ForegroundColor Green
     
     # Helper method that returns a hashset of contacts in WhatsApp
-    $contacts = Get-WhatsAppContacts -Web_Driver $driver
-    $contacts = $contacts | Where-Object {$_ -ne $null} | Where-Object {$_.GetType().Name -eq "String"}
+    $contacts = Get-WhatsAppContacts -Web_Driver $driver `
+    | Where-Object {$_ -ne $null} `
+        | Where-Object {$_.GetType().Name -eq "String"}
     
     try {
         # Helper method that exports conversations + media in WhatsApp
@@ -68,9 +68,9 @@ try {
     }
         
 
-    Write-Host "$($contacts.count) contacts retrieved!" -ForegroundColor Green
+    Write-Output "$($contacts.count) contacts retrieved!" -ForegroundColor Green
 
-    Write-Host "$($conversations.count) conversations retreived!" -ForegroundColor Green
+    Write-Output "$($conversations.count) conversations retreived!" -ForegroundColor Green
 
     $output_folder_path = [System.IO.Path]::Combine(
         "collected_data"

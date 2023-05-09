@@ -3,3 +3,4 @@ venv/
 User_Data/
 collected_data/
 *.User_Data/
+*.Downloads/*
