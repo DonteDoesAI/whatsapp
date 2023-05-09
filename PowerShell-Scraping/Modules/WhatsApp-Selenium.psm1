@@ -85,13 +85,17 @@ Function Get-WhatsAppFiles {
 
     # Download all media 
     try{ 
-        # Click the media pane
-        $media_links_docs_pane = $Web_Driver.FindElementByXPath(
-            '//*[@data-testid="section-media"]'
-        )
-        $media_links_docs_pane.Click()
 
-        Start-Sleep -Seconds 5
+        # Click the media pane (if it isn't clicked already)
+        try {
+            $media_links_docs_pane = $Web_Driver.FindElementByXPath(
+                '//*[@data-testid="section-media"]'
+            )
+            $media_links_docs_pane.Click()
+
+            Start-Sleep -Seconds 5
+        }
+        catch {}
 
         $media_pane = $Web_Driver.FindElementByXPath(
             '//*[@title="{0}"]' -f ($File_Type)
@@ -100,54 +104,113 @@ Function Get-WhatsAppFiles {
 
         Switch ($File_Type) {
             ("Media") {
-                $data_testid_code = "media-download"
                 # Click the 'Download' Button on all files
                 # to preload the media; there is an empty try-catch block
                 # that essentially ignores any errors when attempting to click a download button.
                 $Web_Driver.FindElementsByXPath(
-                    '//*[@data-testid="{0}"]' -f $($data_testid_code)
+                    '//*[@data-testid="media-download"]'
                 ) | ForEach-Object {
                     try {$_.Click()} catch {Write-Error $error[0]}
                 }
 
                 # 
                 $media_files = $Web_Driver.FindElementsByXPath(
-                    '//*[@data-testid="{0}"]' -f ($data_testid_code)
+                    '//*[@data-testid="media-canvas"]'
                 ) 
 
-                $media_files | ForEach-Object {
-                    $_.Click()
+                # Routine to download items
+                foreach ($media_file in $media_files) {
+                    $media_file.click()
                     Start-Sleep -Seconds 5
+
+                    # $src = $Web_Driver.FindElementsByXPath(
+                    #     '//*[@class="gndfcl4n p357zi0d ppled2lx ac2vgrno gfz4du6o r7fjleex g0rxnol2 ln8gz9je b9fczbqn _11JPr"]'
+                    # ).GetAttribute("src")
 
                     $Web_Driver.FindElementsByXPath(
                         '//*[@aria-label="Download"]'
                     ).Click()
                     Start-Sleep -Seconds 5
 
-                    $(
-                        (Get-ChildItem "C:\Users\$($env:USERNAME)\Downloads" `
-                            | Sort-Object -Descending LastWriteTime)[0] `
-                                | Move-Item -Destination $([System.IO.Path]::combine($Subject_Folder_Path,$File_Type)) -Force
+                    $download_folder = $(
+                        [System.IO.Path]::combine(
+                            (Get-Location).Path,
+                            "Chrome.Downloads"
+                        )
+                    )
+                    
+                    $most_recent_download = (Get-ChildItem $download_folder `
+                        | Sort-Object -Descending LastWriteTime)[0]
+
+                    $most_recent_download | Move-Item -Destination $(
+                        [System.IO.Path]::combine($Subject_Folder_Path,$File_Type)
                     )
 
                     $Web_Driver.FindElementsByXPath(
                         '//*[@aria-label="Close"]'
                     ).Click()
                 }
+
+                # $media_files | ForEach-Object {
+                #     $_.Click()
+                #     Start-Sleep -Seconds 5
+
+                #     $Web_Driver.FindElementsByXPath(
+                #         '//*[@aria-label="Download"]'
+                #     ).Click()
+                #     Start-Sleep -Seconds 5
+
+                #     $(
+                #         (Get-ChildItem $([System.IO.Path]::combine((Get-Item $PSScriptRoot).Parent.FullName)) `
+                #             | Sort-Object -Descending LastWriteTime)[0] `
+                #                 | Move-Item -Destination $([System.IO.Path]::combine($Subject_Folder_Path,$File_Type)) -Force
+                #     )
+
+                #     $Web_Driver.FindElementsByXPath(
+                #         '//*[@aria-label="Close"]'
+                #     ).Click()
+                # }
             }
             ("Docs") {
                 $data_testid_code = "doc-gallery"
 
-                $Web_Driver.FindElementsByXPath(
+                $docs = $Web_Driver.FindElementsByXPath(
                     '//*[@data-testid="{0}"]' -f $($data_testid_code)
-                ) | ForEach-Object {
-                    try {$_.Click()} catch {Write-Error $error[0]}
-                }
-                $(
-                    (Get-ChildItem "C:\Users\$($env:USERNAME)\Downloads" `
-                        | Sort-Object -Descending LastWriteTime)[0] `
-                            | Move-Item -Destination $([System.IO.Path]::combine($Subject_Folder_Path,$File_Type)) -Force
-                )
+                ) 
+                # Routine to download items
+                foreach ($doc in $docs) {
+                    $doc.click()
+                    Start-Sleep -Seconds 5
+
+                    $download_folder = $(
+                        [System.IO.Path]::combine(
+                            (Get-Location).Path,
+                            "Chrome.Downloads"
+                        )
+                    )
+
+                    $most_recent_download = (Get-ChildItem $download_folder `
+                        | Sort-Object -Descending LastWriteTime)[0]
+
+                    $most_recent_download | Move-Item -Destination $(
+                        [System.IO.Path]::combine($Subject_Folder_Path,$File_Type)
+                    )
+                }                
+                # $Web_Driver.FindElementsByXPath(
+                #     '//*[@data-testid="{0}"]' -f $($data_testid_code)
+                # ) | ForEach-Object {
+                #     try {
+                #         $_.Click()
+                #         Start-Sleep -Seconds 5
+                #         $(
+                #             (Get-ChildItem $([System.IO.Path]::combine($(Get-Item $PSScriptRoot).Parent.FullName),"Chrome.Downloads") `
+                #                 | Sort-Object -Descending LastWriteTime)[0] `
+                #                     | Move-Item -Destination $([System.IO.Path]::combine($Subject_Folder_Path,$File_Type)) -Force
+                #         )
+                #     } catch {
+                #         Write-Error $error[0]
+                #     }
+                # }
             }
         }
     }
@@ -355,6 +418,7 @@ Function Get-WhatsAppMessages {
         if (!(Test-Path $subject_folder_path)) {
             New-Item $subject_folder_path -ItemType Directory
             New-Item ([System.IO.Path]::combine($subject_folder_path,"Media")) -ItemType Directory
+            New-Item ([System.IO.Path]::combine($subject_folder_path,"Docs")) -ItemType Directory
         }
 
         # Helper method designed to trawl through the Web Page, and download all associated

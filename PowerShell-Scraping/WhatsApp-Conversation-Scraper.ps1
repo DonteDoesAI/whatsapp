@@ -34,17 +34,32 @@ $CHROMEDRIVER_PATH = [System.IO.Path]::Combine(
 
 $user_data_path = [System.IO.Path]::Combine(
     $PSScriptRoot,
-    "$($driver_choice).User_Data"
+    "Chrome.User_Data"
 )
 
 $whatsapp_url = "https://web.whatsapp.com/"
 
-$arguments = @(
-    "user-data-dir=$($user_data_path)"
+$download_directory = [System.IO.Path]::combine(
+    $PSScriptRoot,
+    "Chrome.Downloads"
 )
 
+# $arguments = @(
+#     "user-data-dir=$($user_data_path)"
+# )
+
+# $args = @{
+#     "user-data-dir"=$($user_data_path)
+#     "download.default-directory"=$($download_directory)
+# }
+
 $ChromeOptions = New-Object OpenQA.Selenium.Chrome.ChromeOptions
-$ChromeOptions.AddArguments($arguments)
+$ChromeOptions.AddArguments("user-data-dir=$($user_data_path)")
+$ChromeOptions.AddArguments("--browser.download.folderList=2");
+$ChromeOptions.AddArguments("--browser.helperApps.neverAsk.saveToDisk=image/jpg");
+$ChromeOptions.AddArguments("--browser.download.dir="+$download_directory);
+$ChromeOptions.AddUserProfilePreference("download.default_directory", $download_directory);
+
 
 # Starting a driver with the given cmdlet is a pain in the butt; apparently calling the C# method directly
 # is much more stable, using the Chrome Driver DIRECTORY (vice the explicit path).
