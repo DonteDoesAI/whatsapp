@@ -9,20 +9,6 @@ $modules = @(
     "$($PSScriptRoot)\Modules\SeleniumWhatsApp.psm1" # Custom
 )
 
-# If the modules don't exist, install for the current scope
-$modules | ForEach-Object {
-    if (!(Get-Module -ListAvailable -Name $_)) {
-        Write-Output "'$($_)' does not exist; installing...";
-        Install-Module $_ `
-            -Scope CurrentUser `
-            -ErrorAction Stop `
-            -Force 
-    }
-    else {
-        Write-Output "'$($_)' exists!"
-    }
-}
-
 # Import all modules necessary
 $modules | ForEach-Object {
     Write-Output "Importing '$($_)'..."
@@ -34,6 +20,10 @@ $CHROMEDRIVER_PATH = [System.IO.Path]::Combine(
     "utils"
 )
 
+# Kill all Chrome Browsers if they're open.
+if (Get-Process chrome -ErrorAction SilentlyContinue) { Stop-Process -Force -ErrorAction SilentlyContinue }
+
+# Start Google Chrome with a defined set of preferences
 $CHROME_DOWNLOAD_DIR_PATH = $([System.IO.Path]::combine($PSScriptRoot,"Chrome.Downloads"))
 $CHROME_USER_PREFS_PATH = $([System.IO.Path]::combine($PSScriptRoot,"Chrome.User_Data")) 
 
@@ -47,7 +37,7 @@ Start-Sleep -Seconds 3
 # Navigate to WhatsApp
 $driver.Navigate().GoToUrl("https://web.whatsapp.com")
 
-Read-Host "Press Enter after the QR Code is Entered"
+Read-Host "Press Enter after the QR Code is Entered, and the Main Menu is Launched"
 
 try {
     Write-Output "Getting contact list..." -ForegroundColor Green
@@ -61,7 +51,8 @@ try {
         # Helper method that exports conversations + media in WhatsApp
         $conversations = Get-WhatsAppMessages `
             -Web_Driver $driver `
-            -Contact_List $contacts
+            -Contact_List $contacts `
+            -Export_Conversations `
     }
     catch {
         Write-Error $error[0]

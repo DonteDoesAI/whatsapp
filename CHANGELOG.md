@@ -4,7 +4,9 @@
 ### Changes
 - Added `ChromiumDownloader.ps1` to automate the installation of the Chrome Driver, designed to match the computer's installed copy of Google Chrome.
 - Fixed a bug in `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppContacts` where the contact "You" would be included within the contact list.
+- Added debug messages for `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppMessages`; added a switch parameter to allow users to decide whether conversations should be exported or not.
 - Added a paragraph in README.md to include notes covering PowerShell automation of ChromeDriver downloads.
+- Fixed bug in `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppFiles`where Documents would not download because the app would click too quickly through the tab.
 
 ## [0.1.0.0] - 09 May 2023
 ### Changes

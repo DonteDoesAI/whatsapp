@@ -30,6 +30,11 @@ Function Start-ChromeDriver {
         [Parameter(Mandatory=$true)][Object]$User_Data,
         [Parameter(Mandatory=$true)][Object]$Download_Directory
     )
+    Write-Debug "Start-ChromeDriver"
+
+    if (!(Test-Path $Download_Directory)) {
+        New-Item -ItemType Directory $Download_Directory | Out-Null
+    }
 
     $ChromeOptions = New-Object OpenQA.Selenium.Chrome.ChromeOptions
     $ChromeOptions.AddArguments("user-data-dir=$($User_Data)")
@@ -51,6 +56,7 @@ Function Clear-WhatsAppContactSearchBar {
         [Parameter(Mandatory=$true)][Object]$Web_Driver,
         [Parameter(Mandatory=$true)][Object]$WhatsApp_Search_Bar_Object
     )
+    Write-Debug "Clear-WhatsAppContactSearchBar"
 
     # Check to clear search bar in case it has text.
     if ($WhatsApp_Search_Bar_Object.Text -ne "") {
@@ -76,6 +82,7 @@ Function Move-WhatsAppConversationPane {
         [Parameter(Mandatory=$true)][Object]$Conversation_Pane,
         [Parameter(Mandatory=$false)][Object]$Page_Up_Max=50
     )
+    Write-Debug "Move-WhatsAppConversationPane"
     $conversation_pane_last_height = $Conversation_Pane.size.height
     $pg_up_num_times = 0
     While ($true) {
@@ -104,10 +111,10 @@ Function Get-WhatsAppFiles {
         [Parameter(Mandatory=$true)][Object]$Subject_Folder_Path,
         [Parameter(Mandatory=$false)][ValidateSet("Media","Docs")][Object]$File_Type
     )
+    Write-Debug "Get-WhatsAppFiles, File_Type: $($File_Type)"
 
     # Download all media 
     try{ 
-
         # Click the media pane (if it isn't clicked already)
         try {
             $media_links_docs_pane = $Web_Driver.FindElementByXPath(
@@ -115,7 +122,7 @@ Function Get-WhatsAppFiles {
             )
             $media_links_docs_pane.Click()
 
-            Start-Sleep -Seconds 5
+            # Start-Sleep -Seconds 5
         }
         catch {}
 
@@ -139,6 +146,8 @@ Function Get-WhatsAppFiles {
                 $media_files = $Web_Driver.FindElementsByXPath(
                     '//*[@data-testid="media-canvas"]'
                 ) 
+
+                Write-Debug "$($media_files.count) Media files found."
 
                 # Routine to download items
                 foreach ($media_file in $media_files) {
@@ -172,9 +181,12 @@ Function Get-WhatsAppFiles {
             ("Docs") {
                 $docs_download_class = "_233fJ"
 
+                Start-Sleep -Seconds 5
+
                 $docs = $Web_Driver.FindElementsByXPath(
                     '//*[@class="{0}"]' -f $($docs_download_class)
                 ) 
+                Write-Debug "$($docs.count) Doc files found."
                 # Routine to download items
                 foreach ($doc in $docs) {
                     $doc.click()
@@ -198,6 +210,12 @@ Function Get-WhatsAppFiles {
         }
     }
     catch {}
+
+    $back_button = $Web_Driver.FindElementByXPath(
+        '//*[@id="app"]/div/div/div[6]/span/div/span/div/header/div/div[1]/div/span'
+    )
+    $back_button.click()
+
     return $Web_Driver
 }
 
@@ -207,6 +225,7 @@ Function Get-WhatsAppContacts {
         [Parameter(Mandatory=$true)][Object]$Web_Driver,
         [Parameter(Mandatory=$false)][Object]$Max_Times_Check=5
     )
+    Write-Debug "Get-WhatsAppContacts"
 
     try {
         Write-Debug "Getting contact list..."
@@ -261,6 +280,7 @@ Function Get-WhatsAppScrollMaxHeight {
         [Parameter(Mandatory=$true)][Object]$Web_Driver,
         [Parameter(Mandatory=$true)][Object]$Arguments
     )
+    Write-Debug "Get-WhatsAppScrollMaxHeight"
     return $Web_Driver.ExecuteScript(
         "return arguments[0].scrollHeight",
         $Arguments
@@ -272,6 +292,7 @@ Function Get-WhatsAppScrollBar {
         [Parameter(Mandatory=$true)][Object]$Web_Driver,
         [Parameter(Mandatory=$false)][ValidateSet("pane-side","pane-message")][Object]$Pane="pane-side"
     )
+    Write-Debug "Get-WhatsAppScrollBar"
     $pane_class = ""
     switch ($Pane) {
         "pane-side" {
@@ -297,6 +318,7 @@ Function Move-WhatsAppPane {
         [Parameter(Mandatory=$false)][ValidateSet("pane-side","pane-message")][Object]$Pane="pane-side",
         [Parameter(Mandatory=$true)][Object]$Scroll_Level
     )
+    Write-Debug "Move-WhatsAppPane"
     # Write-Debug "Scrolling $($pane_class)..." | Out-Null
 
     $pane_object = Get-WhatsAppScrollBar -Web_Driver $Web_Driver -Pane $Pane
@@ -313,8 +335,10 @@ Function Get-WhatsAppMessages {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][Object]$Web_Driver,
-        [Parameter(Mandatory=$true)][Object]$Contact_List
+        [Parameter(Mandatory=$true)][Object]$Contact_List,
+        [Parameter(Mandatory=$false)][Switch]$Export_Conversations=$false
     )
+    Write-Debug "Get-WhatsAppMessages"
     Write-Debug "$($Contact_List.Count) contact(s) identified."
     Write-Debug "Getting Messages..." 
     $conversations = @{}
@@ -386,10 +410,6 @@ Function Get-WhatsAppMessages {
 
         $subject_folder_name = "$($contact).$($phone_number).$($full_name)"
 
-        if ($contact -ne $full_name) {
-            # Write-Debug "Stop!"
-        }
-
         $subject_folder_path = [System.IO.Path]::Combine(
             $(Get-Item $PSScriptRoot `
                 | Select-Object -ExpandProperty Parent `
@@ -401,7 +421,7 @@ Function Get-WhatsAppMessages {
             $subject_folder_name
         )
     
-        if (!(Test-Path $subject_folder_path)) {
+        if (!(Test-Path $subject_folder_path) -and $Export_Conversations) {
             New-Item $subject_folder_path -ItemType Directory
             New-Item ([System.IO.Path]::combine($subject_folder_path,"Media")) -ItemType Directory
             New-Item ([System.IO.Path]::combine($subject_folder_path,"Docs")) -ItemType Directory
@@ -409,9 +429,10 @@ Function Get-WhatsAppMessages {
 
         # Helper method designed to trawl through the Web Page, and download all associated
         # media files.
-        $Web_Driver = Get-WhatsAppFiles -Web_Driver $Web_Driver -Subject_Folder_Path $subject_folder_path -File_Type Media
-        $Web_Driver = Get-WhatsAppFiles -Web_Driver $Web_Driver -Subject_Folder_Path $subject_folder_path -File_Type Docs
-
+        if ($Export_Conversations) {
+            $Web_Driver = Get-WhatsAppFiles -Web_Driver $Web_Driver -Subject_Folder_Path $subject_folder_path -File_Type Media
+            $Web_Driver = Get-WhatsAppFiles -Web_Driver $Web_Driver -Subject_Folder_Path $subject_folder_path -File_Type Docs
+        }
         $messages = New-Object System.Collections.Generic.HashSet[String]
 
         $length = 0
@@ -434,7 +455,9 @@ Function Get-WhatsAppMessages {
                 $message_body = $e.text
                 $full_message = "$($header.trim()) $($message_body)"
                 $messages.Add($full_message)
-                # Write-Debug $full_message
+                if (!($messages.contains($full_message))) {
+                    Write-Debug $full_message
+                }
             }
 
             # If all messages have been collected, export to a json and continue with
@@ -450,9 +473,10 @@ Function Get-WhatsAppMessages {
                 if (Test-Path $conversation_file_path) {
                     Remove-Item $conversation_file_path
                 }
-            
-                $json_string = $messages | ConvertTo-Json -Depth 100
-                $json_string | Out-File $conversation_file_path
+                if ($Export_Conversations) {
+                    $json_string = $messages | ConvertTo-Json -Depth 100
+                    $json_string | Out-File $conversation_file_path
+                }
                 # # Write-Debug "Messages -> $($messages)"                 
                 break
             }

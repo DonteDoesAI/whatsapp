@@ -2,7 +2,7 @@
 Just a simple WhatsApp web scraping to collect conversation data.
 
 ## To run:
- - Download [ChromeDriver] (https://chromedriver.chromium.org/downloads "ChromeDriver")and place it in the utils folder, if you prefer you can install it and add it to the PATH system
+ - Download [ChromeDriver](https://chromedriver.chromium.org/downloads "ChromeDriver") and place it in the utils folder, if you prefer you can install it and add it to the PATH system
     - Alternatively, you can use `ChromiumDownloader.ps1` to dynamically download a ChromeDriver that works with your installed
     Google Chrome.
  - Install all dependencies with the command `pip install requirements.txt`
