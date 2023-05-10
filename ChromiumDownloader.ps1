@@ -20,13 +20,16 @@ $hrefs = $Chrome_Driver_Download_Page.ParsedHtml.Links `
                 @{N="Link";E={$_.ie8_href}}
             ) -Unique
 
+# Select drivers where the major revision matches the version of Google Chrome installed,
+# Cast the Application as a System.Version Object, and place most recent version
+#  at the top of the list
 $valid_drivers = $hrefs `
     | Where-Object {
-        $_.Version.Major ` # Select drivers where the major revision matches the version of Google Chrome Installed
+        $_.Version.Major `
             -eq `
-        ([System.Version]$Chrome_Application.FileVersion).Major # Cast the Application as a System.Version Object
+        ([System.Version]$Chrome_Application.FileVersion).Major 
     } `
-    | Sort-Object -Property Version -Descending # The most recent version is placed at the top of the list
+    | Sort-Object -Property Version -Descending 
 
 $selected_driver = $valid_drivers[0]
 
@@ -34,8 +37,8 @@ $driver_uri = "https://chromedriver.storage.googleapis.com/$($selected_driver.Ve
 $zip_path = $([System.IO.Path]::combine("utils","chromedriver_win32.zip"))
 # Download the correct chrome driver.
 
-$driver_page = Invoke-WebRequest `
+Invoke-WebRequest `
     -Uri $driver_uri `
     -OutFile $zip_path
 
-Expand-Archive $zip_path -DestinationPath "utils"
+Expand-Archive $zip_path -DestinationPath "utils" -Force
