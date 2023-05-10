@@ -251,7 +251,8 @@ Function Get-WhatsAppContacts {
     $deduped_sorted_contacts = $contacts `
         | Where-Object {$_ -ne $null} `
             | Where-Object {$_.GetType().Name -eq "String"} `
-                | Sort-Object
+                | Where-Object {$_ -notlike "*(You)"} `
+                    | Sort-Object
     return $deduped_sorted_contacts
 }
 Function Get-WhatsAppScrollMaxHeight {
