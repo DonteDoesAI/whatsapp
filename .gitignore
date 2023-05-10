@@ -6,3 +6,5 @@ collected_data/
 *.Downloads/*
 */chromedriver.exe
 */LICENSE.chromedriver
+*zip
+*exe
