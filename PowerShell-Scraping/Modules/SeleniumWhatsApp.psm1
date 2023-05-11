@@ -311,6 +311,16 @@ Function Get-WhatsAppScrollBar {
 
     return $pane_object 
 }
+Function Get-WhatsAppSearchBar {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]$Web_Driver
+    )
+    Write-Debug "Get-WhatsAppSearchBar"
+    $xpath = '//*[@title="Search input textbox"]'
+    $search_bar = $Web_Driver.FindElementByXPath($xpath)
+    return $search_bar
+}
 Function Move-WhatsAppPane {
     [CmdletBinding()]
     param(
@@ -346,8 +356,7 @@ Function Get-WhatsAppMessages {
     foreach ($contact in $Contact_List) {
         Write-Debug "Contact: $($contact)" 
 
-        # XPath to search bar:
-        $search_bar = $Web_Driver.FindElementbyXPath('//*[@id="side"]/div[1]/div/div/div[2]/div/div[1]/p')
+        $search_bar = Get-WhatsAppSearchBar -Web_Driver $Web_Driver
         $search_bar.Click()
 
         # Check to clear search bar in case it has text.
@@ -357,7 +366,7 @@ Function Get-WhatsAppMessages {
                 -WhatsApp_Search_Bar_Object $search_bar
         }
 
-        $search_bar = $Web_Driver.FindElementbyXPath('//*[@id="side"]/div[1]/div/div/div[2]/div/div[1]/p')
+        $search_bar = Get-WhatsAppSearchBar -Web_Driver $Web_Driver
         $search_bar.SendKeys($contact)
         
         Start-Sleep -Seconds 5
@@ -443,7 +452,7 @@ Function Get-WhatsAppMessages {
         $Web_Driver = Move-WhatsAppConversationPane `
             -Web_Driver $Web_Driver `
             -Conversation_Pane $conversation_pane `
-            -Page_Up_Max 50
+            -Page_Up_Max 100
 
         While ($true) {
             # Get all rows that are rendered; remove rows that have no text.
@@ -454,10 +463,8 @@ Function Get-WhatsAppMessages {
                 $header = $e.GetAttribute('data-pre-plain-text')
                 $message_body = $e.text
                 $full_message = "$($header.trim()) $($message_body)"
-                $messages.Add($full_message)
-                if (!($messages.contains($full_message))) {
-                    Write-Debug $full_message
-                }
+                $messages.Add($full_message) | Out-Null
+                Write-Debug $messages[0]
             }
 
             # If all messages have been collected, export to a json and continue with

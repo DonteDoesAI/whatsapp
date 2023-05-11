@@ -1,5 +1,10 @@
 # Change Log
 
+## [0.3.0.0] - 11 May 2023
+### Changes
+- Added `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppSearchBar`.
+- Added `PowerShell-Scraping\Sandbox.ps1`.
+
 ## [0.2.0.0] - 10 May 2023
 ### Changes
 - Added `ChromiumDownloader.ps1` to automate the installation of the Chrome Driver, designed to match the computer's installed copy of Google Chrome.
