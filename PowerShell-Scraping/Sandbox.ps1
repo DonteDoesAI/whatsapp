@@ -44,32 +44,72 @@ Read-Host "Press Enter after the QR Code is Entered, and the Main Menu is Launch
 $user_page = Get-WhatsAppChat -Web_Driver $driver -Access_Method SnapViaURL -Phone_Number (Read-Host)
 # Messages
 
-$message = Get-Content .\Input\test.txt -Raw
+$message = Get-Content .\Input\numbers.txt -Raw
 
 Set-WhatsAppMessageBarText -Web_Driver $driver -Message $message
 $message_bar = Get-WhatsAppMessageBar -Web_Driver $driver 
 $message_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
 
-$attachment_file_path = Get-Item ([System.IO.Path]::combine(
-    "Input",
-    "test.txt"
-))
+# $attachment_file_path = Get-Item ([System.IO.Path]::combine(
+#     "Input",
+#     "test.txt"
+# ))
 
-$attachment_button = $driver.FindElementByXPath(
-    '//div[@title = "Attach"]'
-)
-$attachment_button.click()
+# $attachment_button = $driver.FindElementByXPath(
+#     '//div[@title = "Attach"]'
+# )
+# $attachment_button.click()
 
-$image_box = $driver.FindElementByXPath(
-    '//input[@accept="image/*,video/mp4,video/3gpp,video/quicktime"]'
-)
+# $image_box = $driver.FindElementByXPath(
+#     '//input[@accept="image/*,video/mp4,video/3gpp,video/quicktime"]'
+# )
 
-$image_box.SendKeys($attachment_file_path.FullName)
+# $image_box.SendKeys($attachment_file_path.FullName)
 
 Start-Sleep 3
 
 $send_button = $driver.FindElementByXPath('//span[@data-icon="send"]')
 $send_button.Click()
+
+Function Get-WhatsAppMessageHyperLinks {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][Object]$Web_Driver
+    )
+    Write-Debug "Get-WhatsAppMessageHyperLinks"
+    $text_class = "_11JPr selectable-text copyable-text"
+    $hyperlink_style = "cursor: pointer;"
+
+    $xpath = '//*[@class="{0}" and @style="{1}"]' -f ($text_class, $hyperlink_style)
+
+    $hyperlinked_messages = $driver.FindElementsByXPath($xpath)
+
+    return $hyperlinked_messages
+}
+
+# FIXME - for some reason this doesn't return the correct answer but will parse correctly if run outside of a function
+Function Test-WhatsAppAccount {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][Object]$Web_Driver
+    )
+    Write-Debug "Test-WhatsAppAccount"
+    $xpath = '//*[@data-testid="mi-message-on-whatsapp"]'
+    
+    try {
+        $element = $Web_Driver.FindElementsByXPath(
+            $xpath
+        )
+        return $true
+    }
+    catch {
+        Write-Debug "Failure!"
+        return $false
+    }
+}
+
+$hyperlinks = Get-WhatsAppMessageHyperLinks -Web_Driver $driver
+Test-WhatsAppAccount -Web_Driver $driver
 
 # $contacts = @()
 
