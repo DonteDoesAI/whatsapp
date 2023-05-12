@@ -495,5 +495,113 @@ Function Get-WhatsAppMessages {
         }
     }
     return $conversations
+}
 
+Function Get-WhatsAppChat {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true,ParameterSetName="SearchBar")]
+        [Parameter(Mandatory=$true,ParameterSetName="SnapViaURL")]
+        [Object]$Web_Driver,
+        
+        [Parameter(Mandatory=$false,ParameterSetName="SnapViaURL")]
+        [Object]$Phone_Number=$null,
+
+        [Parameter(Mandatory=$false,ParameterSetName="SearchBar")]
+        [Object]$Name=$null,
+        
+        [Parameter(Mandatory=$false,ParameterSetName="SearchBar")]
+        [Switch]$Search_Self=$false,
+
+        [Parameter(Mandatory=$false,ParameterSetName="SnapViaURL")]
+        [Object]$Message="",
+
+        [Parameter(Mandatory=$false,ParameterSetName="SearchBar")][ValidateSet("SnapViaURL","SearchBar")]
+        [Parameter(Mandatory=$false,ParameterSetName="SnapViaURL")][ValidateSet("SnapViaURL","SearchBar")]
+        [Object]$Access_Method="SearchBar"
+    )
+    Write-Debug "Get-WhatsAppContactPage; '$($Access_Method)' mode"
+
+    if ($false -eq $Search_Self) {
+        if ( ($null -eq $Phone_Number) -and ($null -eq $Name) ) {
+            Write-Error "Need at least a Name or a Phone Number!"
+            return
+        }
+    }
+
+    switch ($Access_Method) {
+        ("SnapViaURL") {
+            $url_encoded_message = [System.Web.HttpUtility]::UrlEncode($Message)
+
+            $uri = "https://web.whatsapp.com/send?phone=$([System.Web.HttpUtility]::UrlEncode($Phone_Number))" + `
+                "&text=$($url_encoded_message)" + `
+                "&source&data&app_absent"
+            Write-Debug "Navigating to '$($uri)'..."
+            $Web_Driver.Navigate().GoToUrl($uri)
+            Start-Sleep -Seconds 5
+        
+            return $Web_Driver
+        }
+        ("Searchbar") {
+            Move-WhatsAppPane -Web_Driver $Web_Driver -Pane pane-side -Scroll_Level 0 | Out-Null
+
+            $search_bar = Get-WhatsAppSearchBar `
+                -Web_Driver $driver
+        
+            $Web_Driver = Clear-WhatsAppContactSearchBar -Web_Driver $Web_Driver `
+                -WhatsApp_Search_Bar_Object $search_bar
+        
+            $search_bar.Click()
+
+            if ($Search_Self) {
+                $search_bar.SendKeys("(You)")
+            } 
+            else {
+                $search_bar.SendKeys($Name)
+            }
+
+            Start-Sleep -Seconds 5
+            
+            # This is the prefix for each class of text that corresponds to a subject's name in the search bar.
+            # The owning/controlling user account has a different tag than other contacts; it's ordered like
+            # this: "{prefix} {chat_suffix}"
+            # $contact_label = "ggj6brxn gfz4du6o r7fjleex g0rxnol2 lhj4utae le5p0ye3 l7jjieqr _11JPr"
+            # $self_label    = "tvf2evcx gfz4du6o r7fjleex g0rxnol2 lhj4utae le5p0ye3 l7jjieqr _11JPr"
+
+            $self_prefix_message_class = "ggj6brxn"
+            $default_prefix_message_class = "tvf2evcx"
+            $chat_suffix_message_class = "gfz4du6o r7fjleex g0rxnol2 lhj4utae le5p0ye3 l7jjieqr _11JPr"
+            $self_text_class = "seopfc61 i539y0ga _11JPr"
+
+            if ($Search_Self) {
+                $xpath = '//*[contains(@class,"{0}") and contains(@data-testid,"you-label")]' -f ($self_text_class)
+            }
+            else {
+                $xpath = '//*[contains(@class,"{0}") and contains(@title,"{1}")]' -f ($chat_suffix_message_class, $Name)
+            }
+
+            Write-Debug "Xpath: '$($xpath)'"
+            
+            $user = $Web_Driver.FindElementsByXpath($xpath) `
+                | Where-Object {($_.Text -like "*$($name)*" -or ($_.Text -like "*$($Phone_Number)*"))}
+
+            if ($null -eq $user) {
+                Write-Error "Could not find requested information!"
+            }
+            return $user
+        }
+    }
+}
+
+Function Get-WhatsAppMessageBar {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][Object]$Web_Driver
+    )
+    Write-Debug "Get-WhatsAppMessageBar"
+    $message_bar_class = "conversation-compose-box-input"
+    $message_bar = $driver.FindElementByXPath(
+        '//*[@data-testid="{0}"]' -f ($message_bar_class)
+    )
+    return $message_bar
 }

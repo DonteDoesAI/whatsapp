@@ -1,4 +1,5 @@
 # Get Chrome Version
+Set-Location $PSScriptRoot
 $ErrorActionPreference = "Stop"
 try {
     $Chrome_Application = (
@@ -35,6 +36,7 @@ $selected_driver = $valid_drivers[0]
 
 $driver_uri = "https://chromedriver.storage.googleapis.com/$($selected_driver.Version)/chromedriver_win32.zip"
 $zip_path = $([System.IO.Path]::combine("utils","chromedriver_win32.zip"))
+Write-Debug $zip_path
 # Download the correct chrome driver.
 
 Invoke-WebRequest `

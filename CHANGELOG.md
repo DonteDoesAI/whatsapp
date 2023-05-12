@@ -4,6 +4,8 @@
 ### Changes
 - Added `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppSearchBar`.
 - Added `PowerShell-Scraping\Sandbox.ps1`.
+- Added `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppChat` to provide an interface to grab a chat using 2 different methods via URL Redirect, or via the search bar.
+- Added `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppMessageBar`.
 
 ## [0.2.0.0] - 10 May 2023
 ### Changes

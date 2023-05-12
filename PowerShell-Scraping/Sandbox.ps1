@@ -41,19 +41,40 @@ $driver.Navigate().GoToUrl("https://web.whatsapp.com")
 
 Read-Host "Press Enter after the QR Code is Entered, and the Main Menu is Launched"
 
-$contacts = @()
 
-Get-WhatsAppMessages `
-    -Web_Driver $driver `
-    -Contact_List $contacts
+# $user_page = Get-WhatsAppChat -Web_Driver $driver -Access_Method SnapViaURL -Phone_Number "15712150398"
 
-# Function Get-WhatsAppSearchBar {
-#     [CmdletBinding()]
-#     param(
-#         [Parameter(Mandatory=$true)]$Web_Driver
-#     )
-#     Write-Debug "Get-WhatsAppSearchBar"
-#     $xpath = '//*[@title="Search input textbox"]'
-#     $search_bar = $Web_Driver.FindElementByXPath($xpath)
-#     return $search_bar
-# }
+# $user_page.click()
+# Messages
+$message = Get-Content .\Input\test.txt -Raw
+
+$message_bar = Get-WhatsAppMessageBar -Web_Driver $driver
+$message_bar.SendKeys($message)
+$message_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
+
+$attachment_file_path = Get-Item ([System.IO.Path]::combine(
+    "Input",
+    "test.txt"
+))
+
+$attachment_button = $driver.FindElementByXPath(
+    '//div[@title = "Attach"]'
+)
+$attachment_button.click()
+
+$image_box = $driver.FindElementByXPath(
+    '//input[@accept="image/*,video/mp4,video/3gpp,video/quicktime"]'
+)
+
+$image_box.SendKeys($attachment_file_path.FullName)
+
+Start-Sleep 3
+
+$send_button = $driver.FindElementByXPath('//span[@data-icon="send"]')
+$send_button.Click()
+
+# $contacts = @()
+
+# Get-WhatsAppMessages `
+#     -Web_Driver $driver `
+#     -Contact_List $contacts
