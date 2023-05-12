@@ -41,15 +41,13 @@ $driver.Navigate().GoToUrl("https://web.whatsapp.com")
 
 Read-Host "Press Enter after the QR Code is Entered, and the Main Menu is Launched"
 
-
-# $user_page = Get-WhatsAppChat -Web_Driver $driver -Access_Method SnapViaURL -Phone_Number "15712150398"
-
-# $user_page.click()
+$user_page = Get-WhatsAppChat -Web_Driver $driver -Access_Method SnapViaURL -Phone_Number (Read-Host)
 # Messages
+
 $message = Get-Content .\Input\test.txt -Raw
 
-$message_bar = Get-WhatsAppMessageBar -Web_Driver $driver
-$message_bar.SendKeys($message)
+Set-WhatsAppMessageBarText -Web_Driver $driver -Message $message
+$message_bar = Get-WhatsAppMessageBar -Web_Driver $driver 
 $message_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
 
 $attachment_file_path = Get-Item ([System.IO.Path]::combine(

@@ -605,3 +605,16 @@ Function Get-WhatsAppMessageBar {
     )
     return $message_bar
 }
+
+Function Set-WhatsAppMessageBarText {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][Object]$Message,
+        [Parameter(Mandatory=$true)][Object]$Web_Driver
+    )
+    Write-Debug "Set-WhatsAppMessageBarText"
+    $Message_Bar = Get-WhatsAppMessageBar -Web_Driver $Web_Driver
+    $Message_Bar.SendKeys([OpenQA.Selenium.Keys]::Control + "A")
+    $Message_Bar.SendKeys($message)
+    return
+}
