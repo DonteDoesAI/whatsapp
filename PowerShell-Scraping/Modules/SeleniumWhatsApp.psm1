@@ -606,13 +606,13 @@ Function Get-WhatsAppMessageBar {
     return $message_bar
 }
 
-Function Set-WhatsAppMessageBarText {
+Function Set-WhatsAppMessage {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][Object]$Message,
         [Parameter(Mandatory=$true)][Object]$Web_Driver
     )
-    Write-Debug "Set-WhatsAppMessageBarText"
+    Write-Debug "Set-WhatsAppMessage"
     $Message_Bar = Get-WhatsAppMessageBar -Web_Driver $Web_Driver
     $Message_Bar.SendKeys([OpenQA.Selenium.Keys]::Control + "A")
 
@@ -661,22 +661,117 @@ Function Set-WhatsAppAttachment {
     
         $image_box.SendKeys($file.FullName)
 
-        # Start-Sleep -Seconds 3
+        Start-Sleep -Seconds 3
 
-        $attachment_message_div = $Web_Driver.FindElementByXPath(
+        $attachment_message_bar = $Web_Driver.FindElementByXPath(
             '//*[@data-testid="media-caption-input-container"]'
         )
-        $attachment_message_div.SendKeys($Message)
+        $attachment_message_bar.SendKeys($Message)
 
         if ($SendImmediately) {
-            $attachment_message_div.SendKeys([OpenQA.Selenium.Keys]::Enter)
+            $attachment_message_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
             return
         }
 
-        return $attachment_message_div
+        return $attachment_message_bar
     }
     else {
         Write-Error "Could not find item at '$($file.FullName)'!"
         return
     }
 }
+
+Function Send-WhatsAppAttachment {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [Object]$Web_Driver
+    )
+    Write-Debug "Send-WhatsAppAttachment"
+
+    $attachment_message_bar = $Web_Driver.FindElementByXPath(
+        '//*[@data-testid="media-caption-input-container"]'
+    )
+
+    $attachment_message_bar.SendKeys(
+        [OpenQA.Selenium.Keys]::Enter
+    )
+
+    return
+}
+
+Function Send-WhatsAppMessage {
+    [CmdletBinding()] 
+    param(
+        [Parameter(Mandatory=$true)]$Web_Driver
+    )
+    Write-Debug "Send-WhatsAppMessage"
+
+    $message_bar = Get-WhatsAppMessageBar -Web_Driver $Web_Driver
+    $message_bar.SendKeys(
+        [OpenQA.Selenium.Keys]::Enter
+    )
+    return
+}
+
+Function Select-WhatsAppElement {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [Object]$Element
+    )
+    Write-Debug "Select-WhatsAppElement"
+
+    $element.click()
+    return
+}
+
+Function Test-WhatsAppAccount {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [Object]$Web_Driver,
+        
+        [Parameter(Mandatory=$true)]
+        [Object]$Link_Element
+    )
+    Write-Debug "Test-WhatsAppAccount"
+
+    $Link_Element.click()    
+    Start-Sleep -Seconds 2
+
+    $xpath = '//*[@aria-label="Chat with "]'
+    
+    try {
+        $element = $Web_Driver.FindElementsByXPath(
+            $xpath
+        )
+        if ("" -eq $element) {
+            $Link_Element.click()
+            return $false
+        }
+
+        $Link_Element.click()
+        return $true
+    }
+    catch {
+        Write-Debug "Failure!"
+        $Link_Element.click()
+        return $false
+    }
+}
+Function Get-WhatsAppMessageHyperLinks {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][Object]$Web_Driver
+    )
+    Write-Debug "Get-WhatsAppMessageHyperLinks"
+    $text_class = "_11JPr selectable-text copyable-text"
+    $hyperlink_style = "cursor: pointer;"
+
+    $xpath = '//*[@class="{0}" and @style="{1}"]' -f ($text_class, $hyperlink_style)
+
+    $hyperlinked_messages = $driver.FindElementsByXPath($xpath)
+
+    return $hyperlinked_messages
+} 

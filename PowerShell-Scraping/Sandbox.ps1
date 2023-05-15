@@ -14,7 +14,7 @@ $modules = @(
 # Import all modules necessary
 $modules | ForEach-Object {
     Write-Output "Importing '$($_)'..."
-    $_ | Import-Module -ErrorACtion Stop
+    $_ | Import-Module -ErrorAction Stop
 }
 
 $CHROMEDRIVER_PATH = [System.IO.Path]::Combine(
@@ -42,78 +42,6 @@ $driver.Navigate().GoToUrl("https://web.whatsapp.com")
 Read-Host "Press Enter after the QR Code is Entered, and the Main Menu is Launched"
 
 
-# Selecting own chat
-$user_page = Get-WhatsAppChat `
-    -Web_Driver $driver `
-    -Access_Method SearchBar `
-    -Search_Self
-
-$user_page.click()
-
-# Composing and sending Messages
-$message = Get-Content .\Input\numbers.txt -Raw
-
-Set-WhatsAppMessageBarText `
-    -Web_Driver $driver `
-    -Message $message 
-
-$message_bar = Get-WhatsAppMessageBar -Web_Driver $driver 
-$message_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
-
-
-# Sending attachments
-$attachment_file_path = Get-Item ([System.IO.Path]::combine(
-    "Input",
-    "test.txt"
-))
-
-$attachment_bar = Set-WhatsAppAttachment `
-    -Web_Driver $driver `
-    -Path $attachment_file_path `
-    -Message "Uh-oh, Spaghettio!" 
-
-$attachment_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
-
-
-# Test
-
-Function Get-WhatsAppMessageHyperLinks {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)][Object]$Web_Driver
-    )
-    Write-Debug "Get-WhatsAppMessageHyperLinks"
-    $text_class = "_11JPr selectable-text copyable-text"
-    $hyperlink_style = "cursor: pointer;"
-
-    $xpath = '//*[@class="{0}" and @style="{1}"]' -f ($text_class, $hyperlink_style)
-
-    $hyperlinked_messages = $driver.FindElementsByXPath($xpath)
-
-    return $hyperlinked_messages
-}
-
-# FIXME - for some reason this doesn't return the correct answer but will parse correctly if run outside of a function
-Function Test-WhatsAppAccount {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)][Object]$Web_Driver
-    )
-    Write-Debug "Test-WhatsAppAccount"
-    $xpath = '//*[@data-testid="mi-message-on-whatsapp"]'
-    
-    try {
-        $element = $Web_Driver.FindElementsByXPath(
-            $xpath
-        )
-        return $true
-    }
-    catch {
-        Write-Debug "Failure!"
-        return $false
-    }
-}
-
 # $hyperlinks = Get-WhatsAppMessageHyperLinks -Web_Driver $driver
 # Test-WhatsAppAccount -Web_Driver $driver
 
@@ -122,3 +50,76 @@ Function Test-WhatsAppAccount {
 # Get-WhatsAppMessages `
 #     -Web_Driver $driver `
 #     -Contact_List $contacts
+
+# #------------------------------- MESSAGE TEST -------------------------------#
+
+# # Selecting own chat
+# $user_page = Get-WhatsAppChat `
+#     -Web_Driver $driver `
+#     -Access_Method SearchBar `
+#     -Name "Dontavious Jennings"
+
+# $user_page.click()
+
+# # Composing and sending Messages
+# $message = Get-Content .\Input\numbers.txt -Raw
+
+# Set-WhatsAppMessageBarText `
+#     -Web_Driver $driver `
+#     -Message $message 
+
+# Send-WhatsAppMessage -Web_Driver $driver
+
+
+# #------------------------------- MESSAGE TEST -------------------------------#
+
+$chat_object = Get-WhatsAppChat `
+    -Web_Driver $driver `
+    -Access_Method SearchBar `
+    -Search_Self
+
+$phone_numbers = Import-Csv .\Input\
+
+$phone_numbers = $phone_numbers.phone_number | Where-Object {$_ -ne $null}
+
+$phone_numbers = $phone_numbers[0..100]
+
+Select-WhatsAppElement -Element $chat_object
+
+Set-WhatsAppMessage `
+    -Web_Driver $driver `
+    -Message $phone_numbers
+
+Send-WhatsAppMessage `
+    -Web_Driver $driver
+
+# Sending attachments
+$attachment_file_path = Get-Item ([System.IO.Path]::combine(
+    "Input",
+    "test.txt"
+))
+
+Set-WhatsAppAttachment `
+    -Web_Driver $driver `
+    -Path $attachment_file_path `
+    -Message "Uh-oh, Spaghettio!" 
+
+Send-WhatsAppAttachment `
+    -Web_Driver $driver    
+
+$Links = Get-WhatsAppMessageHyperLinks `
+    -Web_Driver $driver
+
+foreach ($link in $links) {
+    $link | Add-Member `
+        -MemberType NoteProperty `
+        -Name "Has_WhatsApp" `
+        -Value $(
+            Test-WhatsAppAccount `
+                -Web_Driver $driver `
+                -Link_Element $link
+        ) `
+        -Force
+}
+
+$links | Out-GridView
