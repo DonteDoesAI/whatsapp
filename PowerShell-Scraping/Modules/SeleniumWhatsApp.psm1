@@ -504,11 +504,11 @@ Function Get-WhatsAppChat {
         [Parameter(Mandatory=$true,ParameterSetName="SnapViaURL")]
         [Object]$Web_Driver,
         
-        [Parameter(Mandatory=$false,ParameterSetName="SnapViaURL")]
-        [Object]$Phone_Number=$null,
+        [Parameter(Mandatory=$true,ParameterSetName="SnapViaURL")]
+        [Object]$Phone_Number,
 
         [Parameter(Mandatory=$false,ParameterSetName="SearchBar")]
-        [Object]$Name=$null,
+        [Object]$Name="",
         
         [Parameter(Mandatory=$false,ParameterSetName="SearchBar")]
         [Switch]$Search_Self=$false,
@@ -615,6 +615,68 @@ Function Set-WhatsAppMessageBarText {
     Write-Debug "Set-WhatsAppMessageBarText"
     $Message_Bar = Get-WhatsAppMessageBar -Web_Driver $Web_Driver
     $Message_Bar.SendKeys([OpenQA.Selenium.Keys]::Control + "A")
-    $Message_Bar.SendKeys($message)
+
+    $split_message = $message.split("`n")
+
+    foreach ($line in $split_message) {
+        $Message_Bar.SendKeys($line)
+
+        if ($split_message.IndexOf($line) -lt $split_message.count-1) {
+            $Message_Bar.SendKeys(
+                [OpenQA.Selenium.Keys]::Shift + 
+                [OpenQA.Selenium.Keys]::Enter
+            ) 
+        }
+    }
     return
+}
+
+Function Set-WhatsAppAttachment {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [Object]$Web_Driver,
+
+        [Parameter(Mandatory=$true)]
+        [Object]$Path,
+
+        [Parameter(Mandatory=$false)]
+        [Object]$Message="",
+        
+        [Parameter(Mandatory=$false)]
+        [Switch]$SendImmediately=$false
+    )
+    Write-Debug "Send-WhatsAppAttachment"
+    
+    if (Test-Path $Path) {
+        $file = Get-Item $Path
+        $attachment_button = $driver.FindElementByXPath(
+            '//div[@title = "Attach"]'
+        )
+        $attachment_button.click()
+    
+        $image_box = $driver.FindElementByXPath(
+            '//input[@accept="image/*,video/mp4,video/3gpp,video/quicktime"]'
+        )
+    
+        $image_box.SendKeys($file.FullName)
+
+        # Start-Sleep -Seconds 3
+
+        $attachment_message_div = $Web_Driver.FindElementByXPath(
+            '//*[@data-testid="media-caption-input-container"]'
+        )
+        $attachment_message_div.SendKeys($Message)
+
+        if ($SendImmediately) {
+            $attachment_message_div.SendKeys([OpenQA.Selenium.Keys]::Enter)
+            return
+        }
+
+        return $attachment_message_div
+    }
+    else {
+        Write-Error "Could not find item at '$($file.FullName)'!"
+        return
+    }
 }

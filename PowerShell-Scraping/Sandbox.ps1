@@ -41,35 +41,41 @@ $driver.Navigate().GoToUrl("https://web.whatsapp.com")
 
 Read-Host "Press Enter after the QR Code is Entered, and the Main Menu is Launched"
 
-$user_page = Get-WhatsAppChat -Web_Driver $driver -Access_Method SnapViaURL -Phone_Number (Read-Host)
-# Messages
 
+# Selecting own chat
+$user_page = Get-WhatsAppChat `
+    -Web_Driver $driver `
+    -Access_Method SearchBar `
+    -Search_Self
+
+$user_page.click()
+
+# Composing and sending Messages
 $message = Get-Content .\Input\numbers.txt -Raw
 
-Set-WhatsAppMessageBarText -Web_Driver $driver -Message $message
+Set-WhatsAppMessageBarText `
+    -Web_Driver $driver `
+    -Message $message 
+
 $message_bar = Get-WhatsAppMessageBar -Web_Driver $driver 
 $message_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
 
-# $attachment_file_path = Get-Item ([System.IO.Path]::combine(
-#     "Input",
-#     "test.txt"
-# ))
 
-# $attachment_button = $driver.FindElementByXPath(
-#     '//div[@title = "Attach"]'
-# )
-# $attachment_button.click()
+# Sending attachments
+$attachment_file_path = Get-Item ([System.IO.Path]::combine(
+    "Input",
+    "test.txt"
+))
 
-# $image_box = $driver.FindElementByXPath(
-#     '//input[@accept="image/*,video/mp4,video/3gpp,video/quicktime"]'
-# )
+$attachment_bar = Set-WhatsAppAttachment `
+    -Web_Driver $driver `
+    -Path $attachment_file_path `
+    -Message "Uh-oh, Spaghettio!" 
 
-# $image_box.SendKeys($attachment_file_path.FullName)
+$attachment_bar.SendKeys([OpenQA.Selenium.Keys]::Enter)
 
-Start-Sleep 3
 
-$send_button = $driver.FindElementByXPath('//span[@data-icon="send"]')
-$send_button.Click()
+# Test
 
 Function Get-WhatsAppMessageHyperLinks {
     [CmdletBinding()]
@@ -108,8 +114,8 @@ Function Test-WhatsAppAccount {
     }
 }
 
-$hyperlinks = Get-WhatsAppMessageHyperLinks -Web_Driver $driver
-Test-WhatsAppAccount -Web_Driver $driver
+# $hyperlinks = Get-WhatsAppMessageHyperLinks -Web_Driver $driver
+# Test-WhatsAppAccount -Web_Driver $driver
 
 # $contacts = @()
 
