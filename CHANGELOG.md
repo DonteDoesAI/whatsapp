@@ -5,7 +5,7 @@
 - Fixed a bug in `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Set-WhatsAppMessageBarText` where messages with line breaks/carriage returns would be sent automatically.
 - Added `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Set-WhatsAppAttachment` to add attachments to the message, with an instant send or a lazy send option.
 
-## [0.3.0.0] - 15 May 2023
+## [0.3.0.0] - 11 May 2023
 ### Changes
 - Added `PowerShell-Scraping\Modules\SeleniumWhatsApp.psm1::Get-WhatsAppSearchBar`.
 - Added `PowerShell-Scraping\Sandbox.ps1`.
